@@ -421,44 +421,46 @@ main {
   color: var(--fg-mute);
 }
 
-.deploy-cmd { display: flex; gap: 7px; align-items: flex-start; }
+.deploy-cmd { position: relative; }
 .cmd-pre {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   background: rgba(0,0,0,0.5);
   border: 1px solid var(--line);
   border-radius: var(--r-btn);
-  padding: 8px 12px;
+  padding: 10px 52px 10px 12px; /* right padding reserves space for copy btn */
   overflow-x: auto;
 }
 .cmd-pre code {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 400;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-all;
   color: var(--fg-mute);
   line-height: 1.65;
 }
 
-/* Copy button — btn-term style from taloscon */
+/* Copy button — large icon, absolute top-right of the code block */
 .copy-btn {
-  flex-shrink: 0;
-  padding: 5px 9px;
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--r-btn);
   border: 1px solid rgba(44,232,185,0.35);
-  background: transparent;
+  background: rgba(11,11,11,0.85);
   color: var(--teal);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
   cursor: pointer;
-  transition: background 0.14s, border-color 0.14s;
-  line-height: 1;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+  backdrop-filter: blur(4px);
 }
-.copy-btn:hover { background: rgba(44,232,185,0.09); border-color: var(--teal); }
-.copy-btn.copied {
-  background: rgba(44,232,185,0.12);
-  border-color: var(--teal);
-}
+.copy-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.copy-btn:hover { background: rgba(44,232,185,0.12); border-color: var(--teal); }
+.copy-btn.copied { background: rgba(44,232,185,0.15); border-color: var(--teal); color: var(--teal); }
 </style>
 </head>
 <body>
@@ -527,8 +529,7 @@ main {
     <div class="filter-group">
       <label>Topology</label>
       <div class="chips" id="topo-chips">
-        <button class="chip active" data-value="all">All</button>
-        <button class="chip" data-value="single-node">Single-node</button>
+        <button class="chip active" data-value="single-node">Single-node</button>
         <button class="chip" data-value="multi-node">Multi-node</button>
       </div>
     </div>
@@ -554,7 +555,10 @@ main {
 const REPO = 'https://github.com/siderolabs/ai-on-k8s';
 
 let catalog = [];
-const state = { type: 'all', hardware: 'all', vram: 0, category: 'all', topology: 'all', search: '' };
+const state = { type: 'all', hardware: 'all', vram: 0, category: 'all', topology: 'single-node', search: '' };
+
+const COPY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 408 480" fill="currentColor" aria-hidden="true"><path d="M299 5v43H43v299H0V48q0-18 12.5-30.5T43 5h256zm64 86q17 0 29.5 12.5T405 133v299q0 18-12.5 30.5T363 475H128q-18 0-30.5-12.5T85 432V133q0-17 12.5-29.5T128 91h235zm0 341V133H128v299h235z"/></svg>`;
+const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -685,7 +689,7 @@ function renderCard(entry) {
     </div>
     <div class="deploy-cmd">
       <div class="cmd-pre"><code class="cmd-text">${esc(initCmd)}</code></div>
-      <button class="copy-btn" title="Copy">⎘</button>
+      <button class="copy-btn" title="Copy to clipboard">${COPY_SVG}</button>
     </div>
   </div>
 </div>`;
@@ -745,9 +749,9 @@ document.getElementById('grid').addEventListener('click', e => {
   if (btn) {
     const text = btn.closest('.deploy-cmd').querySelector('.cmd-text').textContent;
     navigator.clipboard.writeText(text).then(() => {
-      btn.textContent = '✓';
+      btn.innerHTML = CHECK_SVG;
       btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = '⎘'; btn.classList.remove('copied'); }, 1600);
+      setTimeout(() => { btn.innerHTML = COPY_SVG; btn.classList.remove('copied'); }, 1600);
     }).catch(() => {
       const range = document.createRange();
       range.selectNode(btn.closest('.cmd-pre'));
