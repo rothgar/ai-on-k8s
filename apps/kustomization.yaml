@@ -4,3 +4,4 @@ resources:
   - open-webui
   - litellm
   - substrate
+  - n8n

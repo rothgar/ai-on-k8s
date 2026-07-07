@@ -113,20 +113,15 @@ header {
   gap: 20px;
 }
 
-.site-brand { display: flex; align-items: baseline; gap: 8px; text-decoration: none; }
-.site-brand-name {
-  font-size: 1.05rem;
+.site-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; flex-shrink: 0; }
+.sidero-logo { height: 28px; width: auto; flex-shrink: 0; }
+.brand-sep { color: var(--fg-faint); font-size: 1.2rem; font-weight: 200; line-height: 1; }
+.brand-product {
+  font-size: 1.35rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  background: var(--aurora);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.site-brand-by {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--fg-faint);
+  letter-spacing: -0.025em;
+  color: var(--fg);
+  white-space: nowrap;
 }
 
 .header-desc {
@@ -420,6 +415,9 @@ main {
   border-color: var(--line-2);
   color: var(--fg-mute);
 }
+.tab-btn-config { color: rgba(44,232,185,0.6); }
+.tab-btn-config:hover:not(.active) { color: var(--teal); border-color: rgba(44,232,185,0.3); }
+.tab-btn-config.active { background: rgba(44,232,185,0.08); border-color: rgba(44,232,185,0.3); color: var(--teal); }
 
 .deploy-cmd { position: relative; }
 .cmd-pre {
@@ -469,8 +467,28 @@ main {
 <header>
   <div class="header-inner">
     <a class="site-brand" href="https://github.com/siderolabs/ai-on-k8s">
-      <span class="site-brand-name">AI on K8s</span>
-      <span class="site-brand-by">by Siderolabs</span>
+      <svg class="sidero-logo" viewBox="0 0 129 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Siderolabs">
+        <path d="M16.589 0C16.1974 0 15.7896 0.0161943 15.3063 0.0530005C15.1527 0.0647798 15.033 0.192864 15.033 0.345979V33.654C15.033 33.8086 15.1527 33.9367 15.3063 33.947C15.7925 33.9838 16.2004 34 16.5919 34C16.9836 34 17.3885 33.9838 17.8717 33.947C18.0254 33.9352 18.1451 33.8072 18.1451 33.654V0.345979C18.1451 0.191393 18.0254 0.0633064 17.8717 0.0530005C17.3885 0.0176677 16.9836 0 16.595 0H16.589Z" fill="url(#sg0)"/>
+        <path d="M31.5784 7.2214C31.5015 7.2214 31.4262 7.25084 31.3715 7.30531C31.2267 7.44661 31.0819 7.59091 30.9356 7.7367C27.1142 11.5689 25.2463 14.6032 25.2241 17.0133C25.202 19.4131 27.0802 22.4797 30.9666 26.39C31.0789 26.5033 31.1897 26.6138 31.302 26.7227L31.3301 26.7507C31.3863 26.8052 31.4602 26.8361 31.5385 26.8361C31.5473 26.8361 31.5562 26.8361 31.5651 26.8361C31.6523 26.8287 31.7306 26.7831 31.7808 26.7109C32.2907 25.9822 32.7429 25.2181 33.1241 24.4393C33.1788 24.3274 33.1566 24.1934 33.0695 24.1036C30.0061 20.9883 28.3259 18.4811 28.3392 17.0427C28.3525 15.5675 30.0445 13.0529 33.1019 9.96268C33.1891 9.87435 33.2113 9.74039 33.1581 9.62853C32.7813 8.85115 32.332 8.08411 31.8237 7.34951C31.7734 7.27736 31.6952 7.23173 31.6079 7.22432C31.5991 7.22432 31.5888 7.22432 31.5799 7.22432L31.5784 7.2214Z" fill="url(#sg1)"/>
+        <path d="M24.5627 1.70171C24.5287 1.70171 24.4947 1.7076 24.4621 1.71938C24.3868 1.74588 24.3262 1.8033 24.2923 1.87544C21.7593 7.48911 20.1221 13.4355 20.1221 17.0277C20.1221 20.7967 21.6914 26.7534 24.1208 32.2051C24.1534 32.2773 24.2139 32.3347 24.2878 32.3612C24.3203 32.373 24.3558 32.3789 24.3898 32.3789C24.4326 32.3789 24.4769 32.3685 24.5169 32.3509C25.306 31.9754 26.0759 31.5338 26.8029 31.0376C26.9197 30.9582 26.964 30.8065 26.9064 30.677C24.675 25.5933 23.2342 20.2343 23.2342 17.0263C23.2342 13.8183 24.7252 8.57269 27.032 3.41099C27.0896 3.28143 27.0467 3.12979 26.9315 3.05028C26.2148 2.55266 25.4611 2.10805 24.6912 1.73263C24.6498 1.71201 24.6055 1.70318 24.5612 1.70318L24.5627 1.70171Z" fill="url(#sg2)"/>
+        <path d="M8.61665 1.70462C8.57235 1.70462 8.52798 1.71493 8.48662 1.73554C7.71672 2.11244 6.96306 2.55705 6.24638 3.05467C6.12964 3.13564 6.08826 3.28728 6.14589 3.41538C8.4512 8.57704 9.9407 13.9198 9.9407 17.0277C9.9407 20.1356 8.49993 25.5918 6.27003 30.6754C6.21387 30.805 6.25672 30.9567 6.37347 31.0362C7.09458 31.5279 7.85418 31.9651 8.62852 32.3361C8.66838 32.3553 8.71275 32.3656 8.75704 32.3656C8.79103 32.3656 8.82653 32.3597 8.85902 32.3479C8.93437 32.3199 8.99498 32.264 9.02747 32.1904C11.4746 26.6856 13.0558 20.7348 13.0558 17.0292C13.0558 13.3236 11.42 7.49204 8.88714 1.87982C8.85458 1.80769 8.79254 1.75027 8.71718 1.72377C8.68463 1.71199 8.65064 1.70609 8.61665 1.70609V1.70462Z" fill="url(#sg3)"/>
+        <path d="M1.57981 7.22269C1.49263 7.23153 1.4143 7.27716 1.36406 7.34781C0.854239 8.08248 0.405008 8.84952 0.0296617 9.62683C-0.0250147 9.73876 -0.00284865 9.87272 0.0858157 9.96105C3.14327 13.0513 4.83528 15.5659 4.84858 17.0411C4.86779 19.1213 1.23106 22.9669 0.11537 24.0961C0.0281839 24.1844 0.00601781 24.3199 0.0606942 24.4317C0.441952 25.212 0.894141 25.9776 1.40692 26.7093C1.45716 26.78 1.53548 26.8256 1.62267 26.8344C1.63154 26.8344 1.6404 26.8344 1.64927 26.8344C1.72611 26.8344 1.80147 26.8035 1.85763 26.749L1.87684 26.7299C1.99063 26.6166 2.10589 26.5032 2.22115 26.3884C6.10761 22.4781 7.98585 19.4113 7.96367 17.0116C7.94148 14.6016 6.07215 11.5673 2.25218 7.735C2.10737 7.58928 1.96107 7.44648 1.81625 7.30368C1.7601 7.24921 1.68621 7.21976 1.60937 7.21976C1.6005 7.21976 1.59015 7.21976 1.58129 7.21976L1.57981 7.22269Z" fill="url(#sg4)"/>
+        <path d="M56.9074 19.9148C56.9074 22.8511 54.541 24.9086 50.6687 24.9086C46.7749 24.9086 44.3441 22.8296 44.1074 19.5719H47.4203C47.5064 21.2651 48.6035 22.3581 50.6042 22.3581C52.2606 22.3581 53.4438 21.6294 53.4438 20.3863C53.4438 19.4219 52.6909 18.8432 51.3787 18.586L48.8402 18.0931C46.4953 17.643 44.6883 16.3785 44.6883 13.828C44.6883 11.0847 47.1191 9.11288 50.4536 9.11288C53.9171 9.11288 56.4556 11.1275 56.6707 14.3424H53.3578C53.2502 12.735 52.1316 11.6419 50.4966 11.6419C48.9047 11.6419 48.0012 12.5421 48.0012 13.6137C48.0012 14.6639 48.9692 15.114 50.0879 15.3283L52.7339 15.8641C55.4445 16.3999 56.9074 17.643 56.9074 19.9148Z" fill="white"/>
+        <path d="M63.234 24.6943H59.9641V9.30573H63.234V24.6943Z" fill="white"/>
+        <path d="M72.524 24.6943H67.0381V9.30573H72.524C77.4287 9.30573 80.3971 12.4349 80.3971 16.9143C80.3971 21.3937 77.3209 24.6943 72.524 24.6943ZM70.3078 12.1134V21.8866H72.3513C75.4282 21.8866 77.0417 20.1077 77.0417 16.9143C77.0417 13.8494 75.4282 12.1134 72.3513 12.1134H70.3078Z" fill="white"/>
+        <path d="M93.7038 21.8652V24.6943H83.3135V9.30573H93.5536V12.1349H86.5835V15.3711H92.9079V18.1788H86.5835V21.8652H93.7038Z" fill="white"/>
+        <path d="M100.149 24.6943H96.8789V9.30573H102.924C106.818 9.30573 109.077 11.1061 109.077 14.2995C109.077 16.3785 107.786 18.0288 105.592 18.7575L109.571 24.6943H105.678L102.192 19.2505H100.149V24.6943ZM100.149 12.0063V16.5714H102.773C104.753 16.5714 105.807 15.7998 105.807 14.2995C105.807 12.7778 104.753 12.0063 102.773 12.0063H100.149Z" fill="white"/>
+        <path d="M119.159 25.0158C114.705 25.0158 111.263 21.5866 111.263 16.9786C111.263 12.3706 114.705 8.9843 119.159 8.9843C123.633 8.9843 127.097 12.3706 127.097 16.9786C127.097 21.5866 123.633 25.0158 119.159 25.0158ZM119.159 22.101C121.998 22.101 123.72 19.8077 123.72 16.9786C123.72 14.1495 121.998 11.8991 119.159 11.8991C116.341 11.8991 114.619 14.1495 114.619 16.9786C114.619 19.8077 116.341 22.101 119.159 22.101Z" fill="white"/>
+        <defs>
+          <linearGradient id="sg0" x1="16.589" y1="-4.57" x2="16.589" y2="34" gradientUnits="userSpaceOnUse"><stop stop-color="#E8312C"/><stop offset="0.51" stop-color="#E2335A"/><stop offset="1" stop-color="#F77216"/></linearGradient>
+          <linearGradient id="sg1" x1="29.205" y1="4.58" x2="29.205" y2="26.84" gradientUnits="userSpaceOnUse"><stop stop-color="#E8312C"/><stop offset="0.51" stop-color="#E2335A"/><stop offset="1" stop-color="#F77216"/></linearGradient>
+          <linearGradient id="sg2" x1="23.59" y1="-2.42" x2="23.59" y2="32.38" gradientUnits="userSpaceOnUse"><stop stop-color="#E8312C"/><stop offset="0.51" stop-color="#E2335A"/><stop offset="1" stop-color="#F77216"/></linearGradient>
+          <linearGradient id="sg3" x1="9.588" y1="-2.42" x2="9.588" y2="32.37" gradientUnits="userSpaceOnUse"><stop stop-color="#E8312C"/><stop offset="0.51" stop-color="#E2335A"/><stop offset="1" stop-color="#F77216"/></linearGradient>
+          <linearGradient id="sg4" x1="3.982" y1="4.58" x2="3.982" y2="26.83" gradientUnits="userSpaceOnUse"><stop stop-color="#E8312C"/><stop offset="0.51" stop-color="#E2335A"/><stop offset="1" stop-color="#F77216"/></linearGradient>
+        </defs>
+      </svg>
+      <span class="brand-sep">/</span>
+      <span class="brand-product">AI on K8s</span>
     </a>
     <p class="header-desc">Self-hosted AI inference for Kubernetes — pick your hardware, copy your deploy command.</p>
     <a class="btn-ghost" href="https://github.com/siderolabs/ai-on-k8s" target="_blank" rel="noopener">GitHub ↗</a>
@@ -560,6 +578,54 @@ const state = { type: 'all', hardware: 'all', vram: 0, category: 'all', topology
 const COPY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 408 480" fill="currentColor" aria-hidden="true"><path d="M299 5v43H43v299H0V48q0-18 12.5-30.5T43 5h256zm64 86q17 0 29.5 12.5T405 133v299q0 18-12.5 30.5T363 475H128q-18 0-30.5-12.5T85 432V133q0-17 12.5-29.5T128 91h235zm0 341V133H128v299h235z"/></svg>`;
 const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
 
+// Example Flux patches for app configuration — shown in the "Configure" tab
+const CONFIG_EXAMPLES = {
+  'apps/litellm': `# Add to your Flux Kustomization to wire in vLLM endpoints:
+patches:
+  - patch: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: litellm-config
+        namespace: litellm
+      data:
+        config.yaml: |
+          model_list:
+            - model_name: qwen3-8b
+              litellm_params:
+                model: openai/qwen3-8b
+                api_base: http://vllm.qwen3-8b.svc.cluster.local:8000/v1
+                api_key: sk-placeholder
+            - model_name: qwen3-14b
+              litellm_params:
+                model: openai/qwen3-14b
+                api_base: http://vllm.qwen3-14b.svc.cluster.local:8000/v1
+                api_key: sk-placeholder
+    target:
+      kind: ConfigMap
+      name: litellm-config`,
+
+  'apps/open-webui': `# Point at a specific vLLM service instead of LiteLLM:
+patches:
+  - patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: http://vllm.qwen3-8b.svc.cluster.local:8000/v1
+    target:
+      kind: Deployment
+      name: open-webui`,
+
+  'apps/n8n': `# Point AI nodes at a specific vLLM service instead of LiteLLM:
+patches:
+  - patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/env/5/value
+        value: http://vllm.qwen3-8b.svc.cluster.local:8000/v1
+    target:
+      kind: Deployment
+      name: n8n`,
+};
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 function nsFor(path) {
@@ -605,6 +671,9 @@ spec:
   path: ./${path}
   prune: true
   timeout: ${timeout}`;
+  }
+  if (tab === 'configure') {
+    return CONFIG_EXAMPLES[entry.path] || '';
   }
   // argocd
   return `apiVersion: argoproj.io/v1alpha1
@@ -667,6 +736,7 @@ function renderCard(entry) {
     ? `<div class="endpoint">http://vllm.${esc(ns)}.svc.cluster.local:8000/v1</div>`
     : '';
 
+  const hasConfig = !!CONFIG_EXAMPLES[entry.path];
   const initCmd = commandFor(entry, 'kubectl');
 
   return `
@@ -686,6 +756,7 @@ function renderCard(entry) {
       <button class="tab-btn active" data-tab="kubectl">kubectl</button>
       <button class="tab-btn" data-tab="flux">Flux</button>
       <button class="tab-btn" data-tab="argocd">ArgoCD</button>
+      ${hasConfig ? '<button class="tab-btn tab-btn-config" data-tab="configure">Configure</button>' : ''}
     </div>
     <div class="deploy-cmd">
       <div class="cmd-pre"><code class="cmd-text">${esc(initCmd)}</code></div>
@@ -703,7 +774,7 @@ function applyFilters() {
 
   const filtered = catalog.filter(e => {
     if (type !== 'all' && e.type !== type) return false;
-    if (hardware !== 'all' && e.hardware !== hardware) return false;
+    if (hardware !== 'all' && e.hardware !== hardware && e.hardware !== 'any') return false;
     if (vram > 0 && e.hardware !== 'tenstorrent' && e.vram_gb != null && e.vram_gb > vram) return false;
     if (category !== 'all') {
       const cats = e.categories || [];

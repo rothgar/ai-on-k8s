@@ -535,3 +535,12 @@ entries:
     hardware: any
     categories: [agent]
     tags: [agent, orchestration, agentic]
+
+  - id: app-n8n
+    path: apps/n8n
+    type: app
+    name: n8n
+    description: Workflow automation with native AI agent nodes — connects to any OpenAI-compatible endpoint
+    hardware: any
+    categories: [agent]
+    tags: [workflow, automation, agent, agentic, n8n]
