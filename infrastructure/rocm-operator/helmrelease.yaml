@@ -1,0 +1,22 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: amd-gpu-operator
+  namespace: amd-gpu-operator
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: gpu-operator
+      version: ">=1.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: rocm-gpu-operator
+        namespace: amd-gpu-operator
+  values:
+    # Node Feature Discovery discovers AMD GPU nodes and labels them.
+    # If NFD is already installed cluster-wide, set nfd.enabled: false.
+    nfd:
+      enabled: true
+    devicePlugin:
+      enabled: true

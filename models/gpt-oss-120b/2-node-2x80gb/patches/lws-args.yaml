@@ -1,0 +1,66 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: vllm
+spec:
+  leaderWorkerTemplate:
+    size: 2
+    leaderTemplate:
+      spec:
+        containers:
+          - name: vllm
+            image: nvcr.io/nvidia/vllm:26.06-py3
+            command:
+              - bash
+              - -c
+              - |
+                vllm serve openai/gpt-oss-120b \
+                  --download-dir /models \
+                  --host 0.0.0.0 \
+                  --port 8000 \
+                  --served-model-name gpt-oss-120b \
+                  --tool-call-parser openai \
+                  --reasoning-parser openai_gptoss \
+                  --enable-auto-tool-choice \
+                  --tensor-parallel-size 2 \
+                  --pipeline-parallel-size $(LWS_GROUP_SIZE) \
+                  --node-rank 0 \
+                  --master-addr $(LWS_LEADER_ADDRESS) \
+                  --master-port 29500 \
+                  --quantization mxfp4 \
+                  --kv-cache-dtype fp8 \
+                  --gpu-memory-utilization 0.85 \
+                  --max-num-batched-tokens 8192 \
+                  --enable-prefix-caching
+            env:
+              - name: VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8_CUTLASS
+                value: "1"
+            resources:
+              limits:
+                nvidia.com/gpu: "2"
+    workerTemplate:
+      spec:
+        containers:
+          - name: vllm
+            image: nvcr.io/nvidia/vllm:26.06-py3
+            command:
+              - bash
+              - -c
+              - |
+                vllm serve openai/gpt-oss-120b \
+                  --download-dir /models \
+                  --tensor-parallel-size 2 \
+                  --pipeline-parallel-size $(LWS_GROUP_SIZE) \
+                  --node-rank $(LWS_WORKER_INDEX) \
+                  --master-addr $(LWS_LEADER_ADDRESS) \
+                  --master-port 29500 \
+                  --quantization mxfp4 \
+                  --kv-cache-dtype fp8 \
+                  --gpu-memory-utilization 0.85 \
+                  --headless
+            env:
+              - name: VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8_CUTLASS
+                value: "1"
+            resources:
+              limits:
+                nvidia.com/gpu: "2"

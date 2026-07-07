@@ -1,0 +1,32 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tt-operator
+  namespace: tenstorrent-system
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: tt-operator
+      version: ">=0.1.0"
+      sourceRef:
+        kind: HelmRepository
+        name: tt-operator
+        namespace: tenstorrent-system
+  values:
+    # Node Feature Discovery discovers Tenstorrent devices and labels nodes.
+    # If NFD is already installed cluster-wide, set nfd.enabled: false.
+    nfd:
+      enabled: true
+    # Driver manager installs tt-kmd (kernel mode driver) on each GPU node.
+    driverManager:
+      enabled: true
+    # Firmware manager handles device firmware updates.
+    firmwareManager:
+      enabled: true
+    # DRA driver allocates Tenstorrent devices to pods via hugepages.
+    draDriver:
+      enabled: true
+    # Prometheus metrics for Tenstorrent devices.
+    telemetry:
+      enabled: true

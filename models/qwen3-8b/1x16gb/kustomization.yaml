@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: qwen3-8b
+
+resources:
+  - namespace.yaml
+  - ../../_base
+
+patches:
+  - path: patches/model-args.yaml
+  - path: patches/pvc-size.yaml

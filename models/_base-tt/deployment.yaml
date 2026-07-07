@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      tolerations:
+        - key: tenstorrent.com/device
+          operator: Exists
+          effect: NoSchedule
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: vllm
+          image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:latest
+          command:
+            - vllm
+            - serve
+            - PLACEHOLDER_MODEL_ID
+            - --download-dir
+            - /models
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --enable-prefix-caching
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: huggingface-token
+                  key: token
+            - name: HF_HOME
+              value: /models
+            - name: VLLM_TARGET_DEVICE
+              value: tt
+            # Set by overlay: wormhole_b0 or blackhole
+            - name: ARCH_NAME
+              value: PLACEHOLDER_ARCH
+            # Set by overlay: N300, T3K, TG, P300, etc.
+            - name: MESH_DEVICE
+              value: PLACEHOLDER_MESH
+          ports:
+            - containerPort: 8000
+              name: http
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            # TT hardware compilation takes 30-60 minutes on first run
+            initialDelaySeconds: 300
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 120
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            limits:
+              hugepages-1Gi: 32Gi
+              memory: 64Gi
+              cpu: "6"
+            requests:
+              hugepages-1Gi: 32Gi
+              memory: 64Gi
+              cpu: "6"
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: hugepages
+              mountPath: /dev/hugepages
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: vllm-models
+        - name: hugepages
+          emptyDir:
+            medium: HugePages-1Gi
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi

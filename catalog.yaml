@@ -1,0 +1,537 @@
+# AI on K8s — Model & App Catalog
+#
+# Each entry describes one deployable Kustomize directory.
+# Fields:
+#   id           unique kebab-case identifier
+#   path         path from repo root (kubectl apply -k <path>)
+#   type         model | app
+#   name         display name
+#   description  one-line description (apps only)
+#   hf_id        HuggingFace model ID (models only)
+#   hardware     nvidia | amd | intel | tenstorrent | any
+#   vram_gb      total GPU VRAM across all GPUs (omit for Tenstorrent)
+#   gpu_count    total GPUs across all nodes (omit for Tenstorrent and apps)
+#   nodes        number of nodes (default: 1)
+#   topology     single-node | multi-node
+#   tensor_parallel   TP degree
+#   pipeline_parallel PP degree (multi-node only)
+#   precision    fp16 | fp8 | mxfp4 (omit for default fp16)
+#   tt_device    Tenstorrent device name (TT configs only)
+#   categories   list from: chat coding reasoning vision moe agent ui gateway
+#   tags         free-form string list for search
+
+entries:
+
+  # ── NVIDIA — single-node ────────────────────────────────────
+
+  - id: qwen3-4b-nvidia-1x8gb
+    path: models/qwen3-4b/1x8gb
+    type: model
+    name: Qwen3-4B
+    hf_id: Qwen/Qwen3-4B
+    hardware: nvidia
+    vram_gb: 8
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, reasoning]
+    tags: [qwen3, small]
+
+  - id: qwen3-8b-nvidia-1x16gb
+    path: models/qwen3-8b/1x16gb
+    type: model
+    name: Qwen3-8B
+    hf_id: Qwen/Qwen3-8B
+    hardware: nvidia
+    vram_gb: 16
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, reasoning]
+    tags: [qwen3]
+
+  - id: qwen3-14b-nvidia-1x40gb
+    path: models/qwen3-14b/1x40gb
+    type: model
+    name: Qwen3-14B
+    hf_id: Qwen/Qwen3-14B
+    hardware: nvidia
+    vram_gb: 40
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    precision: fp8
+    categories: [chat, reasoning]
+    tags: [qwen3]
+
+  - id: qwen3-14b-nvidia-2x16gb
+    path: models/qwen3-14b/2x16gb
+    type: model
+    name: Qwen3-14B
+    hf_id: Qwen/Qwen3-14B
+    hardware: nvidia
+    vram_gb: 32
+    gpu_count: 2
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, reasoning]
+    tags: [qwen3, tp2]
+
+  - id: qwen3-35b-nvidia-1x128gb
+    path: models/qwen3-35b/1x128gb
+    type: model
+    name: Qwen3-35B-A3B
+    hf_id: Qwen/Qwen3.6-35B-A3B-FP8
+    hardware: nvidia
+    vram_gb: 128
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    precision: fp8
+    categories: [chat, reasoning, moe]
+    tags: [qwen3, moe, gb200, gb10]
+
+  - id: qwen3-35b-nvidia-2x40gb
+    path: models/qwen3-35b/2x40gb
+    type: model
+    name: Qwen3-35B-A3B
+    hf_id: Qwen/Qwen3.6-35B-A3B
+    hardware: nvidia
+    vram_gb: 80
+    gpu_count: 2
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, reasoning, moe]
+    tags: [qwen3, moe, tp2]
+
+  - id: qwen3-35b-nvidia-4x24gb
+    path: models/qwen3-35b/4x24gb
+    type: model
+    name: Qwen3-35B-A3B
+    hf_id: Qwen/Qwen3.6-35B-A3B
+    hardware: nvidia
+    vram_gb: 96
+    gpu_count: 4
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 4
+    categories: [chat, reasoning, moe]
+    tags: [qwen3, moe, tp4]
+
+  - id: qwen3-72b-nvidia-2x80gb
+    path: models/qwen3-72b/2x80gb
+    type: model
+    name: Qwen3-72B
+    hf_id: Qwen/Qwen3-72B
+    hardware: nvidia
+    vram_gb: 160
+    gpu_count: 2
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, reasoning]
+    tags: [qwen3, large, tp2]
+
+  - id: gemma-4-2b-it-nvidia-1x8gb
+    path: models/gemma-4-2b-it/1x8gb
+    type: model
+    name: Gemma-4-2B-IT
+    hf_id: google/gemma-4-2b-it
+    hardware: nvidia
+    vram_gb: 8
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, vision]
+    tags: [gemma, vision, small]
+
+  - id: gemma-4-9b-it-nvidia-1x24gb
+    path: models/gemma-4-9b-it/1x24gb
+    type: model
+    name: Gemma-4-9B-IT
+    hf_id: google/gemma-4-9b-it
+    hardware: nvidia
+    vram_gb: 24
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, vision]
+    tags: [gemma, vision]
+
+  - id: gemma-4-27b-it-nvidia-1x80gb
+    path: models/gemma-4-27b-it/1x80gb
+    type: model
+    name: Gemma-4-27B-IT
+    hf_id: google/gemma-4-27b-it
+    hardware: nvidia
+    vram_gb: 80
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    precision: fp8
+    categories: [chat, vision]
+    tags: [gemma, vision]
+
+  - id: gemma-4-27b-it-nvidia-2x40gb
+    path: models/gemma-4-27b-it/2x40gb
+    type: model
+    name: Gemma-4-27B-IT
+    hf_id: google/gemma-4-27b-it
+    hardware: nvidia
+    vram_gb: 80
+    gpu_count: 2
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, vision]
+    tags: [gemma, vision, tp2]
+
+  - id: gpt-oss-120b-nvidia-1x128gb
+    path: models/gpt-oss-120b/1x128gb
+    type: model
+    name: GPT-OSS-120B
+    hf_id: openai/gpt-oss-120b
+    hardware: nvidia
+    vram_gb: 128
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    precision: mxfp4
+    categories: [chat, reasoning]
+    tags: [gpt-oss, gb200, gb10, mxfp4]
+
+  # ── NVIDIA — multi-node (LWS) ───────────────────────────────
+
+  - id: qwen3-72b-nvidia-2node-4x40gb
+    path: models/qwen3-72b/2-node-4x40gb
+    type: model
+    name: Qwen3-72B
+    hf_id: Qwen/Qwen3-72B
+    hardware: nvidia
+    vram_gb: 320
+    gpu_count: 8
+    nodes: 2
+    topology: multi-node
+    tensor_parallel: 4
+    pipeline_parallel: 2
+    categories: [chat, reasoning]
+    tags: [qwen3, large, lws]
+
+  - id: qwen3-72b-nvidia-4node-2x40gb
+    path: models/qwen3-72b/4-node-2x40gb
+    type: model
+    name: Qwen3-72B
+    hf_id: Qwen/Qwen3-72B
+    hardware: nvidia
+    vram_gb: 320
+    gpu_count: 8
+    nodes: 4
+    topology: multi-node
+    tensor_parallel: 2
+    pipeline_parallel: 4
+    categories: [chat, reasoning]
+    tags: [qwen3, large, lws]
+
+  - id: gpt-oss-120b-nvidia-2node-2x80gb
+    path: models/gpt-oss-120b/2-node-2x80gb
+    type: model
+    name: GPT-OSS-120B
+    hf_id: openai/gpt-oss-120b
+    hardware: nvidia
+    vram_gb: 320
+    gpu_count: 4
+    nodes: 2
+    topology: multi-node
+    tensor_parallel: 2
+    pipeline_parallel: 2
+    categories: [chat, reasoning]
+    tags: [gpt-oss, lws]
+
+  - id: gpt-oss-120b-nvidia-2node-8x80gb
+    path: models/gpt-oss-120b/2-node-8x80gb
+    type: model
+    name: GPT-OSS-120B
+    hf_id: openai/gpt-oss-120b
+    hardware: nvidia
+    vram_gb: 1280
+    gpu_count: 16
+    nodes: 2
+    topology: multi-node
+    tensor_parallel: 8
+    pipeline_parallel: 2
+    categories: [chat, reasoning]
+    tags: [gpt-oss, lws, reference]
+
+  - id: deepseek-v3-nvidia-2node-8x80gb
+    path: models/deepseek-v3/2-node-8x80gb
+    type: model
+    name: DeepSeek-V3
+    hf_id: deepseek-ai/DeepSeek-V3
+    hardware: nvidia
+    vram_gb: 1280
+    gpu_count: 16
+    nodes: 2
+    topology: multi-node
+    tensor_parallel: 8
+    pipeline_parallel: 2
+    precision: fp8
+    categories: [chat, coding, moe]
+    tags: [deepseek, moe, lws]
+
+  - id: deepseek-v3-nvidia-4node-4x80gb
+    path: models/deepseek-v3/4-node-4x80gb
+    type: model
+    name: DeepSeek-V3
+    hf_id: deepseek-ai/DeepSeek-V3
+    hardware: nvidia
+    vram_gb: 1280
+    gpu_count: 16
+    nodes: 4
+    topology: multi-node
+    tensor_parallel: 4
+    pipeline_parallel: 4
+    precision: fp8
+    categories: [chat, coding, moe]
+    tags: [deepseek, moe, lws]
+
+  - id: deepseek-r1-nvidia-2node-8x80gb
+    path: models/deepseek-r1/2-node-8x80gb
+    type: model
+    name: DeepSeek-R1
+    hf_id: deepseek-ai/DeepSeek-R1
+    hardware: nvidia
+    vram_gb: 1280
+    gpu_count: 16
+    nodes: 2
+    topology: multi-node
+    tensor_parallel: 8
+    pipeline_parallel: 2
+    precision: fp8
+    categories: [chat, reasoning, moe]
+    tags: [deepseek, moe, lws, reasoning]
+
+  - id: deepseek-r1-nvidia-4node-4x80gb
+    path: models/deepseek-r1/4-node-4x80gb
+    type: model
+    name: DeepSeek-R1
+    hf_id: deepseek-ai/DeepSeek-R1
+    hardware: nvidia
+    vram_gb: 1280
+    gpu_count: 16
+    nodes: 4
+    topology: multi-node
+    tensor_parallel: 4
+    pipeline_parallel: 4
+    precision: fp8
+    categories: [chat, reasoning, moe]
+    tags: [deepseek, moe, lws, reasoning]
+
+  - id: kimi-k2-nvidia-2node-4x80gb
+    path: models/kimi-k2/2-node-4x80gb
+    type: model
+    name: Kimi-K2
+    hf_id: moonshotai/Kimi-K2-Instruct
+    hardware: nvidia
+    vram_gb: 640
+    gpu_count: 8
+    nodes: 2
+    topology: multi-node
+    tensor_parallel: 4
+    pipeline_parallel: 2
+    categories: [chat, coding, moe]
+    tags: [kimi, moe, lws, coding]
+
+  - id: kimi-k2-nvidia-4node-2x80gb
+    path: models/kimi-k2/4-node-2x80gb
+    type: model
+    name: Kimi-K2
+    hf_id: moonshotai/Kimi-K2-Instruct
+    hardware: nvidia
+    vram_gb: 640
+    gpu_count: 8
+    nodes: 4
+    topology: multi-node
+    tensor_parallel: 2
+    pipeline_parallel: 4
+    categories: [chat, coding, moe]
+    tags: [kimi, moe, lws, coding]
+
+  # ── AMD ROCm ────────────────────────────────────────────────
+
+  - id: qwen3-8b-amd-rocm-1x24gb
+    path: models/qwen3-8b/rocm-1x24gb
+    type: model
+    name: Qwen3-8B
+    hf_id: Qwen/Qwen3-8B
+    hardware: amd
+    vram_gb: 24
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, reasoning]
+    tags: [qwen3, rocm]
+
+  - id: qwen3-14b-amd-rocm-2x24gb
+    path: models/qwen3-14b/rocm-2x24gb
+    type: model
+    name: Qwen3-14B
+    hf_id: Qwen/Qwen3-14B
+    hardware: amd
+    vram_gb: 48
+    gpu_count: 2
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, reasoning]
+    tags: [qwen3, rocm, tp2]
+
+  - id: qwen3-35b-amd-rocm-4x24gb
+    path: models/qwen3-35b/rocm-4x24gb
+    type: model
+    name: Qwen3-35B-A3B
+    hf_id: Qwen/Qwen3.6-35B-A3B-FP8
+    hardware: amd
+    vram_gb: 96
+    gpu_count: 4
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 4
+    precision: fp8
+    categories: [chat, reasoning, moe]
+    tags: [qwen3, rocm, moe, tp4]
+
+  - id: qwen3-72b-amd-rocm-1x192gb
+    path: models/qwen3-72b/rocm-1x192gb
+    type: model
+    name: Qwen3-72B
+    hf_id: Qwen/Qwen3-72B
+    hardware: amd
+    vram_gb: 192
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, reasoning]
+    tags: [qwen3, rocm, mi300x, large]
+
+  # ── Intel Arc ───────────────────────────────────────────────
+
+  - id: qwen3-4b-intel-1x16gb
+    path: models/qwen3-4b/intel-1x16gb
+    type: model
+    name: Qwen3-4B
+    hf_id: Qwen/Qwen3-4B
+    hardware: intel
+    vram_gb: 16
+    gpu_count: 1
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, reasoning]
+    tags: [qwen3, intel, arc]
+
+  - id: qwen3-8b-intel-2x16gb
+    path: models/qwen3-8b/intel-2x16gb
+    type: model
+    name: Qwen3-8B
+    hf_id: Qwen/Qwen3-8B
+    hardware: intel
+    vram_gb: 32
+    gpu_count: 2
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, reasoning]
+    tags: [qwen3, intel, arc, tp2]
+
+  - id: qwen3-14b-intel-2x16gb
+    path: models/qwen3-14b/intel-2x16gb
+    type: model
+    name: Qwen3-14B
+    hf_id: Qwen/Qwen3-14B
+    hardware: intel
+    vram_gb: 32
+    gpu_count: 2
+    nodes: 1
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, reasoning]
+    tags: [qwen3, intel, arc, tp2]
+
+  # ── Tenstorrent ─────────────────────────────────────────────
+
+  - id: qwen3-8b-tt-n150
+    path: models/qwen3-8b/tt-n150
+    type: model
+    name: Qwen3-8B
+    hf_id: Qwen/Qwen3-8B
+    hardware: tenstorrent
+    tt_device: N150
+    topology: single-node
+    tensor_parallel: 1
+    categories: [chat, reasoning]
+    tags: [qwen3, tt, wormhole, n150]
+
+  - id: qwen3-8b-tt-n300
+    path: models/qwen3-8b/tt-n300
+    type: model
+    name: Qwen3-8B
+    hf_id: Qwen/Qwen3-8B
+    hardware: tenstorrent
+    tt_device: N300
+    topology: single-node
+    tensor_parallel: 2
+    categories: [chat, reasoning]
+    tags: [qwen3, tt, wormhole, n300]
+
+  - id: gpt-oss-120b-tt-galaxy
+    path: models/gpt-oss-120b/tt-galaxy
+    type: model
+    name: GPT-OSS-120B
+    hf_id: openai/gpt-oss-120b
+    hardware: tenstorrent
+    tt_device: Galaxy (T3K)
+    topology: single-node
+    tensor_parallel: 8
+    categories: [chat, reasoning]
+    tags: [gpt-oss, tt, wormhole, galaxy, t3k]
+
+  # ── Apps ────────────────────────────────────────────────────
+
+  - id: app-open-webui
+    path: apps/open-webui
+    type: app
+    name: Open WebUI
+    description: Chat UI — connects to LiteLLM or vLLM directly
+    hardware: any
+    categories: [ui]
+    tags: [ui, chat, frontend]
+
+  - id: app-litellm
+    path: apps/litellm
+    type: app
+    name: LiteLLM
+    description: OpenAI-compatible LLM gateway and proxy
+    hardware: any
+    categories: [gateway]
+    tags: [gateway, proxy, openai]
+
+  - id: app-substrate
+    path: apps/substrate
+    type: app
+    name: Substrate
+    description: Actor-based agent orchestration on Kubernetes
+    hardware: any
+    categories: [agent]
+    tags: [agent, orchestration, agentic]

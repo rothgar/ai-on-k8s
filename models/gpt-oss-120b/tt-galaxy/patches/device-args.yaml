@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+spec:
+  template:
+    spec:
+      containers:
+        - name: vllm
+          command:
+            - vllm
+            - serve
+            - openai/gpt-oss-120b
+            - --download-dir
+            - /models
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --served-model-name
+            - gpt-oss-120b
+            - --tensor-parallel-size
+            - "8"
+            - --max-model-len
+            - "32768"
+            - --enable-prefix-caching
+            - --trust-remote-code
+          env:
+            - name: ARCH_NAME
+              value: wormhole_b0
+            - name: MESH_DEVICE
+              value: TG
+          resources:
+            limits:
+              hugepages-1Gi: 256Gi
+              memory: 512Gi
+              cpu: "16"
+            requests:
+              hugepages-1Gi: 256Gi
+              memory: 512Gi
+              cpu: "16"

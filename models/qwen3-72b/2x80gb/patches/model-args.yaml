@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+spec:
+  template:
+    spec:
+      containers:
+        - name: vllm
+          command:
+            - vllm
+            - serve
+            - Qwen/Qwen3-72B
+            - --download-dir
+            - /models
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --served-model-name
+            - qwen3-72b
+            - --tensor-parallel-size
+            - "2"
+            - --gpu-memory-utilization
+            - "0.90"
+            - --max-model-len
+            - "32768"
+            - --enable-prefix-caching
+            - --enable-auto-tool-choice
+            - --tool-call-parser
+            - qwen3_json
+            - --reasoning-parser
+            - qwen3
+            - --trust-remote-code
+          resources:
+            limits:
+              nvidia.com/gpu: "2"

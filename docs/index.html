@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI on K8s — Model Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Backgrounds — taloscon palette */
+  --bg:   #0b0b0b;
+  --bg-2: #0f0f10;
+  --bg-3: #131316;
+  --card: rgba(18, 18, 20, 0.65);
+
+  /* Text */
+  --fg:       #f5f5f4;
+  --fg-mute:  #c8c8c6;
+  --fg-dim:   #8a8a88;
+  --fg-faint: #5a5a58;
+
+  /* Borders */
+  --line:   rgba(255,255,255,0.08);
+  --line-2: rgba(255,255,255,0.16);
+  --line-3: rgba(255,255,255,0.28);
+
+  /* Accents */
+  --teal:   #2ce8b9;
+  --pink:   #fb326e;   /* Siderolabs */
+  --orange: #ff3c00;   /* Siderolabs */
+
+  /* Aurora gradient — taloscon */
+  --aurora: linear-gradient(118deg, #f4b24e 0%, #ff6a37 18%, #e2335a 42%, #a7036f 64%, #29bcd6 100%);
+
+  /* Hardware vendor */
+  --nvidia: #76b900;
+  --amd:    #ed1c24;
+  --intel:  #5bb3ff;
+  --tt:     #ff6b35;
+
+  /* Radii — taloscon */
+  --r-btn:  6px;
+  --r-card: 10px;
+  --r-pill: 999px;
+
+  /* Fonts */
+  --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Fira Code', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle aurora ambient glow behind the header */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 55vh;
+  background: radial-gradient(ellipse 90% 60% at 50% -5%,
+    rgba(44,232,185,0.055) 0%,
+    rgba(230,51,90,0.035) 55%,
+    transparent 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Typography helpers ─────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--fg-faint);
+}
+
+.aurora-text {
+  background: var(--aurora);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+header {
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid var(--line);
+  padding: 0 28px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+}
+.header-inner {
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.site-brand { display: flex; align-items: baseline; gap: 8px; text-decoration: none; }
+.site-brand-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: var(--aurora);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.site-brand-by {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--fg-faint);
+}
+
+.header-desc {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--fg-dim);
+  font-weight: 400;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 15px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  color: var(--fg-mute);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.16s, color 0.16s;
+  white-space: nowrap;
+}
+.btn-ghost:hover { border-color: var(--line-3); color: var(--fg); }
+
+/* ── Filter bar ──────────────────────────────────────────────── */
+.filters-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(11,11,11,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 28px;
+}
+.filters-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-end;
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.filter-group > label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--fg-faint);
+}
+
+/* Chips */
+.chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip {
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--fg-dim);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.14s, color 0.14s, background 0.14s;
+  white-space: nowrap;
+}
+.chip:hover:not(.active) { border-color: var(--line-3); color: var(--fg-mute); }
+
+/* Active states */
+.chip.active {
+  background: rgba(44,232,185,0.1);
+  border-color: rgba(44,232,185,0.35);
+  color: var(--teal);
+  font-weight: 600;
+}
+.chip.hw-nvidia.active {
+  background: rgba(118,185,0,0.1);
+  border-color: rgba(118,185,0,0.4);
+  color: var(--nvidia);
+}
+.chip.hw-amd.active {
+  background: rgba(237,28,36,0.1);
+  border-color: rgba(237,28,36,0.4);
+  color: var(--amd);
+}
+.chip.hw-intel.active {
+  background: rgba(91,179,255,0.1);
+  border-color: rgba(91,179,255,0.4);
+  color: var(--intel);
+}
+.chip.hw-tt.active {
+  background: rgba(255,107,53,0.1);
+  border-color: rgba(255,107,53,0.4);
+  color: var(--tt);
+}
+
+/* Select + search */
+select, #search {
+  height: 30px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  color: var(--fg-mute);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: border-color 0.14s;
+}
+select { appearance: none; padding-right: 26px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a5a58'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
+select:focus, #search:focus { outline: none; border-color: var(--teal); }
+select option { background: var(--bg-2); color: var(--fg); }
+#search { width: 155px; cursor: text; }
+#search::placeholder { color: var(--fg-faint); }
+
+/* ── Main content ────────────────────────────────────────────── */
+main {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 22px 28px 60px;
+}
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+#count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--fg-faint);
+  letter-spacing: 0.03em;
+}
+
+/* ── Card grid ───────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+.no-results {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 72px 0;
+  color: var(--fg-faint);
+  font-size: 0.9rem;
+}
+.no-results code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--fg-dim);
+}
+
+/* ── Card ────────────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+.card:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Card header row */
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.card-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.card-sub {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  color: var(--fg-faint);
+}
+.card-sub a {
+  color: var(--fg-faint);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+.card-sub a:hover { color: var(--teal); }
+
+/* Hardware badge */
+.hw-badge {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border-radius: var(--r-btn);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.hw-badge.nvidia     { background: rgba(118,185,0,0.1);  color: var(--nvidia); border: 1px solid rgba(118,185,0,0.25); }
+.hw-badge.amd        { background: rgba(237,28,36,0.1);  color: var(--amd);    border: 1px solid rgba(237,28,36,0.25); }
+.hw-badge.intel      { background: rgba(91,179,255,0.1); color: var(--intel);  border: 1px solid rgba(91,179,255,0.25); }
+.hw-badge.tenstorrent{ background: rgba(255,107,53,0.1); color: var(--tt);     border: 1px solid rgba(255,107,53,0.25); }
+.hw-badge.any        { background: rgba(255,255,255,0.05); color: var(--fg-dim); border: 1px solid var(--line); }
+
+/* Spec pills */
+.specs { display: flex; flex-wrap: wrap; gap: 5px; }
+.spec-pill {
+  padding: 2px 9px;
+  border-radius: var(--r-btn);
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  font-weight: 500;
+  background: rgba(255,255,255,0.04);
+  color: var(--fg-dim);
+  border: 1px solid var(--line);
+}
+
+/* Category tags */
+.cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.cat-tag {
+  padding: 1px 8px;
+  border-radius: var(--r-btn);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(44,232,185,0.07);
+  color: var(--teal);
+  border: 1px solid rgba(44,232,185,0.18);
+}
+
+/* Cluster endpoint */
+.endpoint {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--fg-faint);
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 5px 9px;
+  background: rgba(255,255,255,0.02);
+  border-radius: var(--r-btn);
+  border: 1px solid var(--line);
+}
+
+/* ── Deploy section ──────────────────────────────────────────── */
+.deploy {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.deploy-tabs { display: flex; gap: 3px; }
+.tab-btn {
+  padding: 3px 10px;
+  border-radius: var(--r-btn);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-faint);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.tab-btn:hover:not(.active) { border-color: var(--line); color: var(--fg-dim); }
+.tab-btn.active {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--line-2);
+  color: var(--fg-mute);
+}
+
+.deploy-cmd { display: flex; gap: 7px; align-items: flex-start; }
+.cmd-pre {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  padding: 8px 12px;
+  overflow-x: auto;
+}
+.cmd-pre code {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  white-space: pre;
+  color: var(--fg-mute);
+  line-height: 1.65;
+}
+
+/* Copy button — btn-term style from taloscon */
+.copy-btn {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: var(--r-btn);
+  border: 1px solid rgba(44,232,185,0.35);
+  background: transparent;
+  color: var(--teal);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+  line-height: 1;
+}
+.copy-btn:hover { background: rgba(44,232,185,0.09); border-color: var(--teal); }
+.copy-btn.copied {
+  background: rgba(44,232,185,0.12);
+  border-color: var(--teal);
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────── -->
+<header>
+  <div class="header-inner">
+    <a class="site-brand" href="https://github.com/siderolabs/ai-on-k8s">
+      <span class="site-brand-name">AI on K8s</span>
+      <span class="site-brand-by">by Siderolabs</span>
+    </a>
+    <p class="header-desc">Self-hosted AI inference for Kubernetes — pick your hardware, copy your deploy command.</p>
+    <a class="btn-ghost" href="https://github.com/siderolabs/ai-on-k8s" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</header>
+
+<!-- ── Filter bar ──────────────────────────────────────────────── -->
+<div class="filters-bar">
+  <div class="filters-inner">
+
+    <div class="filter-group">
+      <label>Type</label>
+      <div class="chips" id="type-chips">
+        <button class="chip active" data-value="all">All</button>
+        <button class="chip" data-value="model">Models</button>
+        <button class="chip" data-value="app">Apps</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Hardware</label>
+      <div class="chips" id="hw-chips">
+        <button class="chip active" data-value="all">All</button>
+        <button class="chip hw-nvidia" data-value="nvidia">NVIDIA</button>
+        <button class="chip hw-amd" data-value="amd">AMD ROCm</button>
+        <button class="chip hw-intel" data-value="intel">Intel Arc</button>
+        <button class="chip hw-tt" data-value="tenstorrent">Tenstorrent</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Max total VRAM</label>
+      <select id="vram-select">
+        <option value="0">Any</option>
+        <option value="16">&#8804; 16 GB</option>
+        <option value="32">&#8804; 32 GB</option>
+        <option value="80">&#8804; 80 GB</option>
+        <option value="192">&#8804; 192 GB</option>
+        <option value="640">&#8804; 640 GB</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Category</label>
+      <div class="chips" id="cat-chips">
+        <button class="chip active" data-value="all">All</button>
+        <button class="chip" data-value="chat">Chat</button>
+        <button class="chip" data-value="coding">Coding</button>
+        <button class="chip" data-value="reasoning">Reasoning</button>
+        <button class="chip" data-value="vision">Vision</button>
+        <button class="chip" data-value="moe">MoE</button>
+        <button class="chip" data-value="agent">Agent / UI</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Topology</label>
+      <div class="chips" id="topo-chips">
+        <button class="chip active" data-value="all">All</button>
+        <button class="chip" data-value="single-node">Single-node</button>
+        <button class="chip" data-value="multi-node">Multi-node</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <input type="text" id="search" placeholder="Search…">
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Main ────────────────────────────────────────────────────── -->
+<main>
+  <div class="results-header">
+    <span id="count">Loading…</span>
+    <a class="btn-ghost" href="https://github.com/siderolabs/ai-on-k8s" target="_blank" rel="noopener" style="font-size:0.75rem;padding:5px 12px;">View on GitHub ↗</a>
+  </div>
+  <div id="grid" class="grid"></div>
+</main>
+
+<script>
+const REPO = 'https://github.com/siderolabs/ai-on-k8s';
+
+let catalog = [];
+const state = { type: 'all', hardware: 'all', vram: 0, category: 'all', topology: 'all', search: '' };
+
+// ── Helpers ──────────────────────────────────────────────────────
+
+function nsFor(path) {
+  return path.split('/')[1]; // models/{ns}/variant or apps/{ns}
+}
+
+function timeoutFor(e) {
+  if (e.hardware === 'tenstorrent') return '120m';
+  if (e.topology  === 'multi-node')  return '30m';
+  return '15m';
+}
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const HW_LABELS = {
+  nvidia: 'NVIDIA', amd: 'AMD ROCm', intel: 'Intel Arc',
+  tenstorrent: 'Tenstorrent', any: 'Any'
+};
+
+function commandFor(entry, tab) {
+  const ns = nsFor(entry.path);
+  const { path } = entry;
+  const timeout  = timeoutFor(entry);
+
+  if (tab === 'kubectl') {
+    return `kubectl apply -k ${REPO}//${path}`;
+  }
+  if (tab === 'flux') {
+    return `apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ${ns}
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: ai-on-k8s
+  path: ./${path}
+  prune: true
+  timeout: ${timeout}`;
+  }
+  // argocd
+  return `apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${ns}
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ${REPO}
+    targetRevision: main
+    path: ${path}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ${ns}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true`;
+}
+
+// ── Card rendering ────────────────────────────────────────────────
+
+function renderCard(entry) {
+  const ns = nsFor(entry.path);
+
+  // Spec pills
+  const specs = [];
+  if (entry.vram_gb)  specs.push(`${entry.vram_gb} GB`);
+  if (entry.tt_device) specs.push(entry.tt_device);
+  if (entry.gpu_count && entry.hardware !== 'tenstorrent') {
+    specs.push(entry.nodes > 1
+      ? `${entry.nodes}× ${entry.gpu_count / entry.nodes} GPU`
+      : `${entry.gpu_count}× GPU`);
+  }
+  if (entry.tensor_parallel   > 1) specs.push(`TP=${entry.tensor_parallel}`);
+  if (entry.pipeline_parallel > 1) specs.push(`PP=${entry.pipeline_parallel}`);
+  if (entry.precision) specs.push(entry.precision.toUpperCase());
+
+  const specsHtml = specs.map(s => `<span class="spec-pill">${esc(s)}</span>`).join('');
+
+  // Category tags
+  const CAT_LABELS = { moe: 'MoE' };
+  const catsHtml = (entry.categories || [])
+    .map(c => `<span class="cat-tag">${esc(CAT_LABELS[c] || c)}</span>`)
+    .join('');
+
+  // Sub-line
+  const subHtml = entry.hf_id
+    ? `<div class="card-sub"><a href="https://huggingface.co/${esc(entry.hf_id)}" target="_blank" rel="noopener">${esc(entry.hf_id)}</a></div>`
+    : entry.description
+    ? `<div class="card-sub">${esc(entry.description)}</div>`
+    : '';
+
+  // Endpoint (models only)
+  const endpointHtml = entry.type === 'model'
+    ? `<div class="endpoint">http://vllm.${esc(ns)}.svc.cluster.local:8000/v1</div>`
+    : '';
+
+  const initCmd = commandFor(entry, 'kubectl');
+
+  return `
+<div class="card" data-path="${esc(entry.path)}">
+  <div class="card-head">
+    <div>
+      <div class="card-name">${esc(entry.name)}</div>
+      ${subHtml}
+    </div>
+    <span class="hw-badge ${esc(entry.hardware)}">${esc(HW_LABELS[entry.hardware] || entry.hardware)}</span>
+  </div>
+  ${specsHtml ? `<div class="specs">${specsHtml}</div>` : ''}
+  ${catsHtml  ? `<div class="cats">${catsHtml}</div>`   : ''}
+  ${endpointHtml}
+  <div class="deploy">
+    <div class="deploy-tabs">
+      <button class="tab-btn active" data-tab="kubectl">kubectl</button>
+      <button class="tab-btn" data-tab="flux">Flux</button>
+      <button class="tab-btn" data-tab="argocd">ArgoCD</button>
+    </div>
+    <div class="deploy-cmd">
+      <div class="cmd-pre"><code class="cmd-text">${esc(initCmd)}</code></div>
+      <button class="copy-btn" title="Copy">⎘</button>
+    </div>
+  </div>
+</div>`;
+}
+
+// ── Filtering ─────────────────────────────────────────────────────
+
+function applyFilters() {
+  const { type, hardware, vram, category, topology, search } = state;
+  const q = search.trim().toLowerCase();
+
+  const filtered = catalog.filter(e => {
+    if (type !== 'all' && e.type !== type) return false;
+    if (hardware !== 'all' && e.hardware !== hardware) return false;
+    if (vram > 0 && e.hardware !== 'tenstorrent' && e.vram_gb != null && e.vram_gb > vram) return false;
+    if (category !== 'all') {
+      const cats = e.categories || [];
+      const hit  = category === 'agent'
+        ? cats.some(c => ['agent','ui','gateway'].includes(c))
+        : cats.includes(category);
+      if (!hit) return false;
+    }
+    if (topology !== 'all' && e.topology && e.topology !== topology) return false;
+    if (q) {
+      const hay = [e.name, e.hf_id, e.path, e.description, ...(e.tags||[]), ...(e.categories||[])]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('count').textContent =
+    `${filtered.length} of ${catalog.length} configurations`;
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = filtered.length
+    ? filtered.map(renderCard).join('')
+    : '<div class="no-results">No configurations match the current filters.</div>';
+}
+
+// ── Event delegation on grid ──────────────────────────────────────
+
+document.getElementById('grid').addEventListener('click', e => {
+  // Tab switch
+  const tab = e.target.closest('.tab-btn');
+  if (tab) {
+    const card  = tab.closest('.card');
+    card.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    tab.classList.add('active');
+    const entry = catalog.find(en => en.path === card.dataset.path);
+    card.querySelector('.cmd-text').textContent = commandFor(entry, tab.dataset.tab);
+    return;
+  }
+
+  // Copy
+  const btn = e.target.closest('.copy-btn');
+  if (btn) {
+    const text = btn.closest('.deploy-cmd').querySelector('.cmd-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '⎘'; btn.classList.remove('copied'); }, 1600);
+    }).catch(() => {
+      const range = document.createRange();
+      range.selectNode(btn.closest('.cmd-pre'));
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    });
+  }
+});
+
+// ── Filter controls ───────────────────────────────────────────────
+
+function chipGroup(id, key) {
+  document.getElementById(id).addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    document.querySelectorAll(`#${id} .chip`).forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state[key] = chip.dataset.value;
+    applyFilters();
+  });
+}
+
+chipGroup('type-chips',  'type');
+chipGroup('hw-chips',    'hardware');
+chipGroup('cat-chips',   'category');
+chipGroup('topo-chips',  'topology');
+
+document.getElementById('vram-select').addEventListener('change', e => {
+  state.vram = parseInt(e.target.value, 10);
+  applyFilters();
+});
+
+document.getElementById('search').addEventListener('input', e => {
+  state.search = e.target.value;
+  applyFilters();
+});
+
+// ── Load catalog ──────────────────────────────────────────────────
+
+async function load() {
+  try {
+    const resp = await fetch('catalog.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    catalog = data.entries || [];
+    applyFilters();
+  } catch (err) {
+    document.getElementById('count').textContent = 'Failed to load catalog';
+    document.getElementById('grid').innerHTML = `<div class="no-results">
+      Could not load <code>catalog.json</code>: ${esc(err.message)}<br><br>
+      Run <code>python3 scripts/build-catalog.py</code> then serve <code>docs/</code> locally.
+    </div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>

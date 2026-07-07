@@ -1,0 +1,55 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: vllm
+spec:
+  leaderWorkerTemplate:
+    size: 2
+    leaderTemplate:
+      spec:
+        containers:
+          - name: vllm
+            command:
+              - bash
+              - -c
+              - |
+                vllm serve moonshotai/Kimi-K2-Instruct \
+                  --download-dir /models \
+                  --host 0.0.0.0 \
+                  --port 8000 \
+                  --served-model-name kimi-k2 \
+                  --tensor-parallel-size 4 \
+                  --pipeline-parallel-size $(LWS_GROUP_SIZE) \
+                  --node-rank 0 \
+                  --master-addr $(LWS_LEADER_ADDRESS) \
+                  --master-port 29500 \
+                  --gpu-memory-utilization 0.92 \
+                  --max-model-len 65536 \
+                  --enable-prefix-caching \
+                  --enable-expert-parallel \
+                  --trust-remote-code
+            resources:
+              limits:
+                nvidia.com/gpu: "4"
+    workerTemplate:
+      spec:
+        containers:
+          - name: vllm
+            command:
+              - bash
+              - -c
+              - |
+                vllm serve moonshotai/Kimi-K2-Instruct \
+                  --download-dir /models \
+                  --tensor-parallel-size 4 \
+                  --pipeline-parallel-size $(LWS_GROUP_SIZE) \
+                  --node-rank $(LWS_WORKER_INDEX) \
+                  --master-addr $(LWS_LEADER_ADDRESS) \
+                  --master-port 29500 \
+                  --gpu-memory-utilization 0.92 \
+                  --headless \
+                  --enable-expert-parallel \
+                  --trust-remote-code
+            resources:
+              limits:
+                nvidia.com/gpu: "4"

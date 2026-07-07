@@ -1,0 +1,146 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: vllm
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 2
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels:
+          app: vllm
+          role: leader
+      spec:
+        runtimeClassName: nvidia
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+        terminationGracePeriodSeconds: 60
+        containers:
+          - name: vllm
+            image: vllm/vllm-openai:v0.9.1
+            command:
+              - bash
+              - -c
+              - |
+                vllm serve PLACEHOLDER_MODEL_ID \
+                  --download-dir /models \
+                  --host 0.0.0.0 \
+                  --port 8000 \
+                  --tensor-parallel-size PLACEHOLDER_TP \
+                  --pipeline-parallel-size $(LWS_GROUP_SIZE) \
+                  --node-rank 0 \
+                  --master-addr $(LWS_LEADER_ADDRESS) \
+                  --master-port 29500 \
+                  --gpu-memory-utilization 0.90 \
+                  --enable-prefix-caching
+            env:
+              - name: HF_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: huggingface-token
+                    key: token
+              - name: HF_HOME
+                value: /models
+              - name: PYTORCH_CUDA_ALLOC_CONF
+                value: expandable_segments:True
+            ports:
+              - containerPort: 8000
+                name: http
+              - containerPort: 29500
+                name: dist-coord
+            startupProbe:
+              httpGet:
+                path: /health
+                port: http
+              initialDelaySeconds: 120
+              periodSeconds: 20
+              timeoutSeconds: 5
+              failureThreshold: 180
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: http
+              periodSeconds: 30
+              timeoutSeconds: 5
+              failureThreshold: 3
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: http
+              periodSeconds: 30
+              timeoutSeconds: 5
+              failureThreshold: 3
+            resources:
+              limits:
+                nvidia.com/gpu: "8"
+            volumeMounts:
+              - name: models
+                mountPath: /models
+              - name: shm
+                mountPath: /dev/shm
+        volumes:
+          - name: models
+            persistentVolumeClaim:
+              claimName: vllm-models
+          - name: shm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 32Gi
+    workerTemplate:
+      metadata:
+        labels:
+          app: vllm
+          role: worker
+      spec:
+        runtimeClassName: nvidia
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+        terminationGracePeriodSeconds: 60
+        containers:
+          - name: vllm
+            image: vllm/vllm-openai:v0.9.1
+            command:
+              - bash
+              - -c
+              - |
+                vllm serve PLACEHOLDER_MODEL_ID \
+                  --download-dir /models \
+                  --tensor-parallel-size PLACEHOLDER_TP \
+                  --pipeline-parallel-size $(LWS_GROUP_SIZE) \
+                  --node-rank $(LWS_WORKER_INDEX) \
+                  --master-addr $(LWS_LEADER_ADDRESS) \
+                  --master-port 29500 \
+                  --gpu-memory-utilization 0.90 \
+                  --headless
+            env:
+              - name: HF_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: huggingface-token
+                    key: token
+              - name: HF_HOME
+                value: /models
+              - name: PYTORCH_CUDA_ALLOC_CONF
+                value: expandable_segments:True
+            resources:
+              limits:
+                nvidia.com/gpu: "8"
+            volumeMounts:
+              - name: models
+                mountPath: /models
+              - name: shm
+                mountPath: /dev/shm
+        volumes:
+          - name: models
+            persistentVolumeClaim:
+              claimName: vllm-models
+          - name: shm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 32Gi

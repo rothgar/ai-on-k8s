@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+spec:
+  template:
+    spec:
+      containers:
+        - name: vllm
+          command:
+            - vllm
+            - serve
+            - Qwen/Qwen3-8B
+            - --download-dir
+            - /models
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --served-model-name
+            - qwen3-8b
+            - --max-model-len
+            - "32768"
+            - --enable-prefix-caching
+            - --enable-auto-tool-choice
+            - --tool-call-parser
+            - qwen3_json
+            - --reasoning-parser
+            - qwen3
+            - --trust-remote-code
+          env:
+            - name: ARCH_NAME
+              value: wormhole_b0
+            - name: MESH_DEVICE
+              value: N150
