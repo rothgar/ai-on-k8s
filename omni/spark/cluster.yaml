@@ -33,7 +33,7 @@ kubernetes:
     # Model weights are stored on the NVMe partition mounted at /var/mnt/vllm-models
     # (provisioned by the UserVolumeConfig in patches/volumes.yaml).
     - name: vllm-qwen3-35b
-      mode: full
+      mode: one-shot
       inline:
         - apiVersion: v1
           kind: Namespace
@@ -169,7 +169,7 @@ kubernetes:
 
     # Open WebUI — chat interface, points directly at vLLM (no litellm needed for single model)
     - name: open-webui
-      mode: full
+      mode: one-shot
       inline:
         - apiVersion: v1
           kind: Namespace
