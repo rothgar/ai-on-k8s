@@ -17,8 +17,9 @@ For multi-node models, [LeaderWorkerSet](https://github.com/kubernetes-sigs/lws)
 
 ```
 models/          # vLLM model deployments, organized by model then hardware config
-apps/            # Example applications (open-webui, litellm, substrate)
+apps/            # Example applications (open-webui, litellm, n8n, substrate)
 infrastructure/  # Hardware operators and cluster prerequisites
+omni/            # Omni cluster templates for one-command cluster + workload deployment
 docs/            # Setup guides
 ```
 
@@ -122,7 +123,24 @@ Each infrastructure README includes the Talos Image Factory schematic ID and mac
 |---|---|---|
 | Open WebUI | [`apps/open-webui/`](apps/open-webui/) | Chat UI, connects to LiteLLM or vLLM directly |
 | LiteLLM | [`apps/litellm/`](apps/litellm/) | OpenAI-compatible LLM gateway and proxy |
+| n8n | [`apps/n8n/`](apps/n8n/) | Workflow automation with native AI agent support |
 | Substrate | [`apps/substrate/`](apps/substrate/) | Actor-based agent orchestration on Kubernetes |
+
+## Omni Cluster Templates
+
+[`omni/`](omni/) contains ready-made cluster templates for [Siderolabs Omni](https://omni.siderolabs.com/). A single command provisions the cluster, configures Talos, and syncs the AI workloads — no separate Flux or ArgoCD required.
+
+| Template | Hardware | Model | Apps |
+|---|---|---|---|
+| [`omni/spark/`](omni/spark/) | NVIDIA DGX Spark (GB10, 128 GB) | Qwen3.6-35B-A3B-FP8 | Open WebUI |
+
+```bash
+export MACHINE_UUID=<uuid>   # from Omni UI or: omnictl get machines
+export HF_TOKEN=hf_xxx
+export CLUSTER_NAME=spark
+envsubst '${MACHINE_UUID} ${HF_TOKEN} ${CLUSTER_NAME}' < omni/spark/cluster.yaml \
+  | omnictl cluster template sync --verbose -f -
+```
 
 ## Overriding StorageClass
 

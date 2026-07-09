@@ -1,0 +1,335 @@
+# Omni cluster template — single-node NVIDIA DGX Spark
+# Deploys: vLLM (Qwen/Qwen3.6-35B-A3B-FP8) + Open WebUI via Kubernetes manifest sync
+#
+# Required environment variables:
+#   MACHINE_UUID  — machine UUID shown in Omni UI or: omnictl get machines
+#   HF_TOKEN      — HuggingFace token with access to Qwen/Qwen3.6-35B-A3B-FP8
+#   CLUSTER_NAME  — name for the cluster (e.g. spark)
+#
+# Usage:
+#   export MACHINE_UUID=<uuid>
+#   export HF_TOKEN=hf_xxx
+#   export CLUSTER_NAME=spark
+#   envsubst '${MACHINE_UUID} ${HF_TOKEN} ${CLUSTER_NAME}' < omni/spark/cluster.yaml \
+#     | omnictl cluster template sync --verbose -f -
+#
+# Prerequisites (install once after cluster is up):
+#   # NVIDIA GPU Operator — manages device plugin, RuntimeClass, and feature discovery
+#   kubectl apply -k https://github.com/siderolabs/ai-on-k8s//infrastructure/nvidia-operator
+#   # local-path-provisioner — StorageClass for Open WebUI data
+#   kubectl apply -k https://github.com/siderolabs/ai-on-k8s//infrastructure/local-path-provisioner
+#
+# Access Open WebUI after cluster is ready:
+#   kubectl port-forward -n open-webui svc/open-webui 8080:80
+#   open http://localhost:8080
+
+kind: Cluster
+name: ${CLUSTER_NAME}
+kubernetes:
+  version: v1.36.2
+  manifests:
+
+    # vLLM serving Qwen/Qwen3.6-35B-A3B-FP8 on the GB10's 128 GB unified memory.
+    # Model weights are stored on the NVMe partition mounted at /var/mnt/vllm-models
+    # (provisioned by the UserVolumeConfig in patches/volumes.yaml).
+    - name: vllm-qwen3-35b
+      mode: full
+      inline:
+        - apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: qwen3-35b
+
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: huggingface-token
+            namespace: qwen3-35b
+          type: Opaque
+          stringData:
+            token: "${HF_TOKEN}"
+
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: vllm
+            namespace: qwen3-35b
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: vllm
+            template:
+              metadata:
+                labels:
+                  app: vllm
+              spec:
+                runtimeClassName: nvidia
+                tolerations:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+                    effect: NoSchedule
+                containers:
+                  - name: vllm
+                    image: vllm/vllm-openai:latest
+                    command:
+                      - vllm
+                      - serve
+                      - Qwen/Qwen3.6-35B-A3B-FP8
+                      - --download-dir
+                      - /models
+                      - --host
+                      - "0.0.0.0"
+                      - --port
+                      - "8000"
+                      - --served-model-name
+                      - qwen3-35b
+                      - qwen3.6-35b-a3b
+                      - --tensor-parallel-size
+                      - "1"
+                      - --gpu-memory-utilization
+                      - "0.90"
+                      - --max-model-len
+                      - "131072"
+                      - --max-num-seqs
+                      - "20"
+                      - --max-num-batched-tokens
+                      - "32768"
+                      - --enable-prefix-caching
+                      - --enable-auto-tool-choice
+                      - --tool-call-parser
+                      - qwen3_coder
+                      - --reasoning-parser
+                      - qwen3
+                      - --trust-remote-code
+                    env:
+                      - name: HF_TOKEN
+                        valueFrom:
+                          secretKeyRef:
+                            name: huggingface-token
+                            key: token
+                      - name: HF_HOME
+                        value: /models
+                    ports:
+                      - name: http
+                        containerPort: 8000
+                    resources:
+                      limits:
+                        nvidia.com/gpu: "1"
+                    volumeMounts:
+                      - name: models
+                        mountPath: /models
+                      - name: shm
+                        mountPath: /dev/shm
+                    startupProbe:
+                      httpGet:
+                        path: /health
+                        port: http
+                      initialDelaySeconds: 120
+                      periodSeconds: 10
+                      failureThreshold: 180
+                    livenessProbe:
+                      httpGet:
+                        path: /health
+                        port: http
+                      periodSeconds: 30
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+                    readinessProbe:
+                      httpGet:
+                        path: /health
+                        port: http
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+                volumes:
+                  - name: models
+                    hostPath:
+                      path: /var/mnt/vllm-models
+                      type: DirectoryOrCreate
+                  - name: shm
+                    emptyDir:
+                      medium: Memory
+                      sizeLimit: 16Gi
+
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: vllm
+            namespace: qwen3-35b
+          spec:
+            selector:
+              app: vllm
+            ports:
+              - name: http
+                port: 8000
+                targetPort: http
+            type: ClusterIP
+
+    # Open WebUI — chat interface, points directly at vLLM (no litellm needed for single model)
+    - name: open-webui
+      mode: full
+      inline:
+        - apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: open-webui
+
+        - apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: open-webui-data
+            namespace: open-webui
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            storageClassName: local-path
+            resources:
+              requests:
+                storage: 10Gi
+
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: open-webui
+            namespace: open-webui
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: open-webui
+            template:
+              metadata:
+                labels:
+                  app: open-webui
+              spec:
+                containers:
+                  - name: open-webui
+                    image: ghcr.io/open-webui/open-webui:main
+                    ports:
+                      - name: http
+                        containerPort: 8080
+                    env:
+                      - name: OPENAI_API_BASE_URL
+                        value: "http://vllm.qwen3-35b.svc.cluster.local:8000/v1"
+                      - name: OPENAI_API_KEY
+                        value: "sk-placeholder"
+                      - name: WEBUI_SECRET_KEY
+                        value: "changeme"
+                      - name: DATA_DIR
+                        value: /app/backend/data
+                      - name: OLLAMA_BASE_URL
+                        value: ""
+                      - name: ENABLE_OLLAMA_API
+                        value: "false"
+                    livenessProbe:
+                      httpGet:
+                        path: /health
+                        port: http
+                      initialDelaySeconds: 30
+                      periodSeconds: 30
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+                    readinessProbe:
+                      httpGet:
+                        path: /health
+                        port: http
+                      initialDelaySeconds: 10
+                      periodSeconds: 10
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+                    resources:
+                      requests:
+                        cpu: "500m"
+                        memory: "1Gi"
+                      limits:
+                        cpu: "2"
+                        memory: "4Gi"
+                    volumeMounts:
+                      - name: data
+                        mountPath: /app/backend/data
+                volumes:
+                  - name: data
+                    persistentVolumeClaim:
+                      claimName: open-webui-data
+
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: open-webui
+            namespace: open-webui
+          spec:
+            selector:
+              app: open-webui
+            ports:
+              - name: http
+                port: 80
+                targetPort: http
+            type: ClusterIP
+
+talos:
+  version: v1.13.6
+
+---
+# Single control-plane node — untainted to run workloads
+kind: ControlPlane
+machines:
+  - ${MACHINE_UUID}
+
+systemExtensions:
+  - siderolabs/nonfree-kmod-nvidia-produciton
+  - siderolabs/nvidia-container-toolkit-production
+
+kernelArgs:
+  - nvidia_drm.modeset=1
+  - iommu=pt
+  - arm64.nobti
+
+patches:
+  # Remove the control-plane taint so pods schedule on this node without tolerations
+  - name: untaint-controlplane
+    inline:
+      cluster:
+        allowSchedulingOnControlPlanes: true
+
+  # Adjust /dev/nvme0n1 if the Spark presents its drive under a different path
+  - name: install-disk
+    inline:
+      machine:
+        install:
+          disk: /dev/nvme0n1
+
+  # Load NVIDIA kernel modules. The nvidia-container-toolkit extension handles
+  # containerd runtime configuration automatically — no manual containerd patch needed.
+  - name: nvidia-kernel-modules
+    inline:
+      machine:
+        kernel:
+          modules:
+            - name: nvidia
+            - name: nvidia_uvm
+            - name: nvidia_drm
+            - name: nvidia_modeset
+
+  - name: ephemeral-volume
+    inline:
+      apiVersion: v1alpha1
+      kind: VolumeConfig
+      name: EPHEMERAL
+      provisioning:
+        diskSelector:
+          match: disk.transport == "nvme"
+        maxSize: 100GiB
+
+  - name: vllm-models-volume
+    inline:
+      apiVersion: v1alpha1
+      kind: UserVolumeConfig
+      name: vllm-models
+      volumeType: partition
+      provisioning:
+        diskSelector:
+          match: disk.transport == "nvme"
+        maxSize: 2TiB
+        minSize: 1TiB
