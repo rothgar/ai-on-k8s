@@ -10,8 +10,9 @@
 #   export MACHINE_UUID=<uuid>
 #   export HF_TOKEN=hf_xxx
 #   export CLUSTER_NAME=spark
-#   envsubst '${MACHINE_UUID} ${HF_TOKEN} ${CLUSTER_NAME}' < omni/spark/cluster.yaml \
-#     | omnictl cluster template sync --verbose -f -
+#   envsubst '${MACHINE_UUID} ${HF_TOKEN} ${CLUSTER_NAME}' \
+#     < omni/spark/cluster.yaml > /tmp/spark-cluster.yaml
+#   omnictl cluster template sync --verbose -f /tmp/spark-cluster.yaml
 #
 # Prerequisites (install once after cluster is up):
 #   # NVIDIA GPU Operator — manages device plugin, RuntimeClass, and feature discovery
@@ -33,7 +34,7 @@ kubernetes:
     # Model weights are stored on the NVMe partition mounted at /var/mnt/vllm-models
     # (provisioned by the UserVolumeConfig in patches/volumes.yaml).
     - name: vllm-qwen3-35b
-      mode: one-shot
+      mode: one-time
       inline:
         - apiVersion: v1
           kind: Namespace
@@ -169,7 +170,7 @@ kubernetes:
 
     # Open WebUI — chat interface, points directly at vLLM (no litellm needed for single model)
     - name: open-webui
-      mode: one-shot
+      mode: one-time
       inline:
         - apiVersion: v1
           kind: Namespace

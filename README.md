@@ -138,8 +138,9 @@ Each infrastructure README includes the Talos Image Factory schematic ID and mac
 export MACHINE_UUID=<uuid>   # from Omni UI or: omnictl get machines
 export HF_TOKEN=hf_xxx
 export CLUSTER_NAME=spark
-envsubst '${MACHINE_UUID} ${HF_TOKEN} ${CLUSTER_NAME}' < omni/spark/cluster.yaml \
-  | omnictl cluster template sync --verbose -f -
+envsubst '${MACHINE_UUID} ${HF_TOKEN} ${CLUSTER_NAME}' \
+  < omni/spark/cluster.yaml > /tmp/spark-cluster.yaml
+omnictl cluster template sync --verbose -f /tmp/spark-cluster.yaml
 ```
 
 ## Overriding StorageClass
