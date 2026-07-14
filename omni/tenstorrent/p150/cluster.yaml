@@ -14,13 +14,13 @@
 #   export HF_TOKEN=hf_xxx
 #   export CLUSTER_NAME=wormhole
 #   envsubst '${MACHINE_UUID} ${HF_TOKEN} ${CLUSTER_NAME}' \
-#     < omni/tenstorrent/cluster.yaml > /tmp/tenstorrent-cluster.yaml
+#     < omni/tenstorrent/p150/cluster.yaml > /tmp/p150-cluster.yaml
 #   omnictl cluster template sync --verbose -f /tmp/tenstorrent-cluster.yaml
 #
 #
-# Access Open WebUI after cluster is ready (first run compiles TT Metal — allow 60+ min):
-#   kubectl port-forward -n open-webui svc/open-webui 8080:80
-#   open http://localhost:8080
+# Access vLLM after cluster is ready (first run compiles TT Metal — allow 60+ min):
+#   kubectl port-forward -n qwen3-14b svc/vllm 8000:8000
+#   curl http://localhost:8000/v1/models
 
 kind: Cluster
 name: ${CLUSTER_NAME}
@@ -30,8 +30,8 @@ kubernetes:
 
     # tt-operator v0.1.0 — rendered from oci://ghcr.io/tenstorrent/helm/tt-operator
     # Disabled: tt-k8s-driver-manager (driver handled by siderolabs/tenstorrent extension),
-    #           tt-fabric-manager, kubepmix, jobset, tt-dra-driver (multi-node only)
-    # Enabled:  node-feature-discovery, tt-telemetry (collector DaemonSet + Service)
+    #           kubepmix, jobset
+    # Enabled:  node-feature-discovery, tt-telemetry, tt-fabric-manager, tt-dra-driver
 
     - name: tt-operator
       mode: one-time
@@ -2538,6 +2538,366 @@ kubernetes:
                     path: /dev/shm
                     type: DirectoryOrCreate
 
+    # tt-fabric-manager (topology agent + controller) and tt-dra-driver (kubelet plugin).
+    # These provide DRA-based device access so vLLM does not need privileged mode.
+    - name: tt-dra
+      mode: one-time
+      inline:
+        - apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: tt-operator-tt-dra-driver-service-account
+            namespace: tt-operator-system
+
+        - apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: tt-fabric-manager
+            namespace: tt-operator-system
+
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: tt-fabric-manager-agent
+            namespace: tt-operator-system
+          data:
+            config.yaml: |
+              controller:
+                listen_address: tt-fabric-manager-controller:50052
+
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: tt-fabric-manager-controller
+            namespace: tt-operator-system
+          data:
+            config.yaml: |
+              controller:
+                listen_address: 0.0.0.0:50052
+                heartbeat_interval_sec: 10
+                heartbeat_timeout_sec: 30
+                daemon_reconnect_timeout_sec: 60
+              otel:
+                enabled: false
+                service_name: "tt-fabric-manager-controller"
+                metric_export_interval_sec: 10
+
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: tt-operator-tt-dra-driver-role
+          rules:
+          - apiGroups: ["resource.k8s.io"]
+            resources: ["resourceclaims"]
+            verbs: ["get"]
+          - apiGroups: [""]
+            resources: ["nodes"]
+            verbs: ["get"]
+          - apiGroups: ["resource.k8s.io"]
+            resources: ["resourceslices"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: tt-operator-tt-dra-driver-role-binding
+          subjects:
+          - kind: ServiceAccount
+            name: tt-operator-tt-dra-driver-service-account
+            namespace: tt-operator-system
+          roleRef:
+            kind: ClusterRole
+            name: tt-operator-tt-dra-driver-role
+            apiGroup: rbac.authorization.k8s.io
+
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: tt-fabric-manager-agent
+            namespace: tt-operator-system
+          spec:
+            type: ClusterIP
+            internalTrafficPolicy: Local
+            ports:
+              - port: 50053
+                targetPort: grpc
+                protocol: TCP
+                name: grpc
+            selector:
+              app.kubernetes.io/name: tt-fabric-manager
+              app.kubernetes.io/instance: tt-operator
+              ttfm.tenstorrent.com/component: agent
+
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: tt-fabric-manager-controller
+            namespace: tt-operator-system
+            annotations:
+              traefik.ingress.kubernetes.io/service.serversscheme: h2c
+          spec:
+            type: ClusterIP
+            ports:
+              - port: 50052
+                targetPort: grpc
+                protocol: TCP
+                name: grpc
+            selector:
+              app.kubernetes.io/name: tt-fabric-manager
+              app.kubernetes.io/instance: tt-operator
+              ttfm.tenstorrent.com/component: controller
+
+        - apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: tt-operator-tt-dra-driver-kubeletplugin
+            namespace: tt-operator-system
+          spec:
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: tt-dra-driver
+                app.kubernetes.io/instance: tt-operator
+                app.kubernetes.io/component: kubeletplugin
+            updateStrategy:
+              rollingUpdate:
+                maxSurge: 1
+                maxUnavailable: 0
+              type: RollingUpdate
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: tt-dra-driver
+                  app.kubernetes.io/instance: tt-operator
+                  app.kubernetes.io/component: kubeletplugin
+              spec:
+                priorityClassName: system-node-critical
+                serviceAccountName: tt-operator-tt-dra-driver-service-account
+                containers:
+                - name: plugin
+                  securityContext:
+                    privileged: true
+                  image: ghcr.io/tenstorrent/tt-dra-driver:0.0.36
+                  imagePullPolicy: IfNotPresent
+                  command: ["tt-dra-driver-kubeletplugin"]
+                  livenessProbe:
+                    grpc:
+                      port: 51515
+                      service: liveness
+                    failureThreshold: 3
+                    periodSeconds: 10
+                  env:
+                  - name: DRIVER_NAME
+                    value: "tenstorrent.com"
+                  - name: DEVICE_PROFILE
+                    value: "tenstorrent"
+                  - name: CDI_ROOT
+                    value: /var/run/cdi
+                  - name: KUBELET_REGISTRAR_DIRECTORY_PATH
+                    value: "/var/lib/kubelet/plugins_registry"
+                  - name: KUBELET_PLUGINS_DIRECTORY_PATH
+                    value: "/var/lib/kubelet/plugins"
+                  - name: NODE_NAME
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: spec.nodeName
+                  - name: NAMESPACE
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: metadata.namespace
+                  - name: FABRIC_MANAGER_AGENT_ADDRESS
+                    value: "tt-fabric-manager-agent.tt-operator-system.svc.cluster.local:50053"
+                  - name: HEALTHCHECK_PORT
+                    value: "51515"
+                  - name: POD_UID
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: metadata.uid
+                  volumeMounts:
+                  - name: plugins-registry
+                    mountPath: "/var/lib/kubelet/plugins_registry"
+                  - name: plugins
+                    mountPath: "/var/lib/kubelet/plugins"
+                  - name: cdi
+                    mountPath: /var/run/cdi
+                volumes:
+                - name: plugins-registry
+                  hostPath:
+                    path: "/var/lib/kubelet/plugins_registry"
+                - name: plugins
+                  hostPath:
+                    path: "/var/lib/kubelet/plugins"
+                - name: cdi
+                  hostPath:
+                    path: /var/run/cdi
+                affinity:
+                  nodeAffinity:
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                      nodeSelectorTerms:
+                        - matchExpressions:
+                            - key: tenstorrent.com/has-tt
+                              operator: In
+                              values: ["true"]
+                        - matchExpressions:
+                            - key: feature.node.kubernetes.io/pci-1200_1e52.present
+                              operator: In
+                              values: ["true"]
+
+        - apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: tt-fabric-manager-agent
+            namespace: tt-operator-system
+          spec:
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: tt-fabric-manager
+                app.kubernetes.io/instance: tt-operator
+            updateStrategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxUnavailable: 100
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: tt-fabric-manager
+                  app.kubernetes.io/instance: tt-operator
+                  ttfm.tenstorrent.com/component: agent
+              spec:
+                serviceAccountName: tt-fabric-manager
+                volumes:
+                - name: config-volume
+                  configMap:
+                    name: tt-fabric-manager-agent
+                - name: scaleout-configs
+                  hostPath:
+                    path: /var/tt-scaleout-configs
+                affinity:
+                  nodeAffinity:
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                      nodeSelectorTerms:
+                        - matchExpressions:
+                            - key: tenstorrent.com/has-tt
+                              operator: In
+                              values: ["true"]
+                        - matchExpressions:
+                            - key: feature.node.kubernetes.io/pci-1200_1e52.present
+                              operator: In
+                              values: ["true"]
+                containers:
+                  - name: tt-fabric-manager-agent
+                    securityContext:
+                      privileged: true
+                    image: "ghcr.io/tenstorrent/tt-fabric-manager:0.2.28"
+                    imagePullPolicy: IfNotPresent
+                    ports:
+                      - name: grpc
+                        containerPort: 50053
+                        protocol: TCP
+                    command:
+                      - "tt-fabric-manager-agent"
+                      - "--host-id"
+                      - "$(HOST_ID)"
+                      - "--advertise-address"
+                      - "$(POD_IP):50053"
+                    env:
+                      - name: HOST_ID
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: spec.nodeName
+                      - name: POD_IP
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: status.podIP
+                    livenessProbe:
+                      exec:
+                        command:
+                        - grpc-health-probe
+                        - -addr=:50053
+                        - -connect-timeout=100ms
+                        - -rpc-timeout=150ms
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                    readinessProbe:
+                      exec:
+                        command:
+                        - grpc-health-probe
+                        - -addr=:50053
+                        - -connect-timeout=100ms
+                        - -rpc-timeout=150ms
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                    volumeMounts:
+                      - name: config-volume
+                        mountPath: /etc/fabric-manager
+                        readOnly: true
+                      - name: scaleout-configs
+                        mountPath: /scaleout_configs
+                        readOnly: true
+
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: tt-fabric-manager-controller
+            namespace: tt-operator-system
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: tt-fabric-manager
+                app.kubernetes.io/instance: tt-operator
+                ttfm.tenstorrent.com/component: controller
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: tt-fabric-manager
+                  app.kubernetes.io/instance: tt-operator
+                  ttfm.tenstorrent.com/component: controller
+              spec:
+                serviceAccountName: tt-fabric-manager
+                volumes:
+                  - name: config-volume
+                    configMap:
+                      name: tt-fabric-manager-controller
+                  - name: scaleout-configs
+                    hostPath:
+                      path: /var/tt-scaleout-configs
+                containers:
+                  - name: tt-fabric-manager
+                    image: "ghcr.io/tenstorrent/tt-fabric-manager:0.2.28"
+                    imagePullPolicy: IfNotPresent
+                    ports:
+                      - name: grpc
+                        containerPort: 50052
+                        protocol: TCP
+                    command:
+                      - "tt-fabric-manager-controller"
+                      - "--config"
+                      - "/etc/fabric-manager/config.yaml"
+                    volumeMounts:
+                      - name: config-volume
+                        mountPath: /etc/fabric-manager
+                        readOnly: true
+                      - name: scaleout-configs
+                        mountPath: /scaleout_configs
+                        readOnly: true
+                    readinessProbe:
+                      exec:
+                        command:
+                        - grpc-health-probe
+                        - -addr=:50052
+                        - -connect-timeout=100ms
+                        - -rpc-timeout=150ms
+                      initialDelaySeconds: 5
+
+        - apiVersion: resource.k8s.io/v1
+          kind: DeviceClass
+          metadata:
+            name: tenstorrent.com
+          spec:
+            selectors:
+            - cel:
+                expression: "device.driver == 'tenstorrent.com'"
+
     # vLLM TT Metal serving Qwen/Qwen3-14B on Blackhole P150 (single chip).
     # First run compiles TT Metal kernels for the model — allow 30-60 minutes.
     - name: qwen3-14b
@@ -2547,10 +2907,6 @@ kubernetes:
           kind: Namespace
           metadata:
             name: qwen3-14b
-            labels:
-              pod-security.kubernetes.io/enforce: privileged
-              pod-security.kubernetes.io/audit: privileged
-              pod-security.kubernetes.io/warn: privileged
 
         - apiVersion: v1
           kind: Secret
@@ -2560,6 +2916,18 @@ kubernetes:
           type: Opaque
           stringData:
             token: "${HF_TOKEN}"
+
+        - apiVersion: resource.k8s.io/v1
+          kind: ResourceClaim
+          metadata:
+            name: vllm-tt-device
+            namespace: qwen3-14b
+          spec:
+            devices:
+              requests:
+                - name: tt
+                  exactly:
+                    deviceClassName: tenstorrent.com
 
         - apiVersion: apps/v1
           kind: Deployment
@@ -2583,48 +2951,47 @@ kubernetes:
                     operator: Exists
                     effect: NoSchedule
                 terminationGracePeriodSeconds: 60
+                enableServiceLinks: false
+                resourceClaims:
+                  - name: tt
+                    resourceClaimName: vllm-tt-device
                 containers:
                   - name: vllm
-                    image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:latest
-                    command:
-                      - vllm
-                      - serve
-                      - Qwen/Qwen3-14B
-                      - --download-dir
-                      - /models
-                      - --host
+                    image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.18.0-c49bb76-6b4a3a7
+                    args:
+                      - "--model"
+                      - "Qwen/Qwen3-14B"
+                      - "--tt-device"
+                      - "p150"
+                      - "--no-auth"
+                      - "--host"
                       - "0.0.0.0"
-                      - --port
+                      - "--port"
                       - "8000"
-                      - --served-model-name
-                      - qwen3-14b
-                      - --enable-prefix-caching
-                      - --trust-remote-code
+                      - "--enable-auto-tool-choice"
+                      - "--tool-call-parser"
+                      - "qwen3_json"
                     env:
                       - name: HF_TOKEN
                         valueFrom:
                           secretKeyRef:
                             name: huggingface-token
                             key: token
-                      - name: HF_HOME
+                      - name: CACHE_ROOT
                         value: /models
-                      - name: VLLM_TARGET_DEVICE
-                        value: tt
-                      - name: ARCH_NAME
-                        value: blackhole
-                      - name: MESH_DEVICE
-                        value: P150
                     ports:
                       - name: http
                         containerPort: 8000
                     resources:
+                      claims:
+                        - name: tt
                       requests:
                         hugepages-1Gi: 28Gi
-                        memory: 64Mi
+                        memory: 8Gi
                         cpu: "1"
                       limits:
                         hugepages-1Gi: 28Gi
-                        memory: 64Mi
+                        memory: 12Gi
                         cpu: "4"
                     volumeMounts:
                       - name: models
@@ -2681,99 +3048,6 @@ kubernetes:
                 targetPort: http
             type: ClusterIP
 
-    # Open WebUI — chat interface, points directly at vLLM
-    - name: open-webui
-      mode: one-time
-      inline:
-        - apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: open-webui
-            labels:
-              pod-security.kubernetes.io/enforce: privileged
-              pod-security.kubernetes.io/audit: privileged
-              pod-security.kubernetes.io/warn: privileged
-
-        - apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: open-webui
-            namespace: open-webui
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: open-webui
-            template:
-              metadata:
-                labels:
-                  app: open-webui
-              spec:
-                containers:
-                  - name: open-webui
-                    image: ghcr.io/open-webui/open-webui:main
-                    ports:
-                      - name: http
-                        containerPort: 8080
-                    env:
-                      - name: OPENAI_API_BASE_URL
-                        value: "http://vllm.qwen3-14b.svc.cluster.local:8000/v1"
-                      - name: OPENAI_API_KEY
-                        value: "sk-placeholder"
-                      - name: WEBUI_SECRET_KEY
-                        value: "changeme"
-                      - name: DATA_DIR
-                        value: /app/backend/data
-                      - name: OLLAMA_BASE_URL
-                        value: ""
-                      - name: ENABLE_OLLAMA_API
-                        value: "false"
-                    livenessProbe:
-                      httpGet:
-                        path: /health
-                        port: http
-                      initialDelaySeconds: 30
-                      periodSeconds: 30
-                      timeoutSeconds: 5
-                      failureThreshold: 3
-                    readinessProbe:
-                      httpGet:
-                        path: /health
-                        port: http
-                      initialDelaySeconds: 10
-                      periodSeconds: 10
-                      timeoutSeconds: 5
-                      failureThreshold: 3
-                    resources:
-                      requests:
-                        cpu: "50m"
-                        memory: "32Mi"
-                      limits:
-                        cpu: "2"
-                        memory: "512Mi"
-                    volumeMounts:
-                      - name: data
-                        mountPath: /app/backend/data
-                volumes:
-                  - name: data
-                    hostPath:
-                      path: /var/mnt/llm-models/open-webui
-                      type: DirectoryOrCreate
-
-        - apiVersion: v1
-          kind: Service
-          metadata:
-            name: open-webui
-            namespace: open-webui
-          spec:
-            selector:
-              app: open-webui
-            ports:
-              - name: http
-                port: 80
-                targetPort: http
-            type: ClusterIP
-
 talos:
   version: v1.13.6
 
@@ -2808,9 +3082,4 @@ patches:
       apiVersion: v1alpha1
       kind: UserVolumeConfig
       name: llm-models
-      volumeType: partition
-      provisioning:
-        diskSelector:
-          match: disk.system_disk
-        maxSize: 200GiB
-        minSize: 50GiB
+      volumeType: directory

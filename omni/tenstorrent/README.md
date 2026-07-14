@@ -6,11 +6,11 @@ Single-node Talos Linux cluster templates for Tenstorrent hardware, provisioned 
 
 | Directory | Card | Architecture | Chips | VRAM | Model |
 |---|---|---|---|---|---|
-| `n150/` | Wormhole N150 | Wormhole | 1 | 12 GB | google/gemma-4-12B-it |
-| `n300/` | Wormhole N300 | Wormhole | 2 | 24 GB | google/gemma-4-12B-it (TP=2) |
+| `n150/` | Wormhole N150 | Wormhole | 1 | 12 GB | Qwen/Qwen3-4B |
+| `n300/` | Wormhole N300 | Wormhole | 2 | 24 GB | Qwen/Qwen3-8B |
 | `p150/` | Blackhole P150 | Blackhole | 1 | 32 GB | Qwen/Qwen3-14B |
-| `2xp150/` | 2× Blackhole P150 | Blackhole | 2 | 64 GB | Qwen/Qwen3-32B (TP=2) |
-| `quietboxv2/` | TT-QuietBox v2 (4× P150) | Blackhole | 4 | 128 GB | Qwen/Qwen3.6-35B-A3B (TP=4) |
+| `2xp150/` | 2× Blackhole P150 | Blackhole | 2 | 64 GB | Qwen/Qwen3-32B |
+| `quietboxv2/` | TT-QuietBox v2 (4× P150) | Blackhole | 4 | 128 GB | Qwen/Qwen3-30B-A3B |
 
 > **Multi-card templates** (`2xp150/`, `quietboxv2/`) require the inter-chip Ethernet links to be configured before deploying. On the TT-QuietBox this is done via the baseboard; on custom builds use `tt-topology -l mesh` after driver installation.
 
@@ -22,7 +22,14 @@ Single-node Talos Linux cluster templates for Tenstorrent hardware, provisioned 
 | tt-k8s-driver-manager | `tt-operator-system` | Firmware upgrade controller (see Firmware Upgrades below) |
 | tt-telemetry | `tt-operator-system` | Per-device metrics collector; NodePort 30080 |
 | vLLM inference server | `<model-name>` | TT Metal backend; model weights at `/var/mnt/llm-models` |
-| Open WebUI | `open-webui` | Chat interface connecting to the vLLM service |
+
+Open WebUI is not deployed by the templates to save resources. To access the API locally:
+
+```bash
+kubectl port-forward -n <model-namespace> svc/vllm 8000:8000
+```
+
+Then point any OpenAI-compatible client at `http://localhost:8000/v1`.
 
 ## Requirements
 
@@ -57,13 +64,13 @@ omnictl cluster template sync --verbose -f /tmp/tt-cluster.yaml
 | Install disk | `/dev/nvme0n1` |
 | LLM storage | 50–200 GiB NVMe partition mounted at `/var/mnt/llm-models` |
 
-## Access Open WebUI
+## Access the API
 
 ```bash
-kubectl port-forward -n open-webui svc/open-webui 8080:80
+kubectl port-forward -n <model-namespace> svc/vllm 8000:8000
 ```
 
-Then open [http://localhost:8080](http://localhost:8080).
+Then use any OpenAI-compatible client at `http://localhost:8000/v1`.
 
 > **Note:** The first time vLLM starts, TT Metal compiles kernels for the model. This takes **30–60+ minutes**. The pod shows `Running` but not `Ready` until compilation finishes. Monitor progress with:
 >
